@@ -1629,6 +1629,21 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
 
     Square prevSq = ((ss - 1)->currentMove).is_ok() ? ((ss - 1)->currentMove).to_sq() : SQ_NONE;
 
+    // Check if forced captures are required (mandatory capture variant)
+    // In quiescence search, we only search captures anyway, but we need to ensure
+    // that if captures exist and we're not in check, we don't allow stand-pat
+    bool hasLegalCaptures = false;
+    if (!ss->inCheck)
+    {
+        const auto captures = MoveList<CAPTURES>(pos);
+        for (const auto& m : captures)
+            if (pos.legal(m))
+            {
+                hasLegalCaptures = true;
+                break;
+            }
+    }
+
     // Initialize a MovePicker object for the current position, and prepare to search
     // the moves. We presently use two stages of move generator in quiescence search:
     // captures, or evasions only when in check.
@@ -1637,6 +1652,13 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
 
     // Step 5. Loop through all pseudo-legal moves until no moves remain or a beta
     // cutoff occurs.
+    // If forced captures are required and we have captures, skip stand-pat
+    if (hasLegalCaptures && !ss->inCheck && bestValue >= beta)
+    {
+        // Don't return stand-pat if captures are forced - we must search captures
+        bestValue = -VALUE_INFINITE;
+    }
+
     while ((move = mp.next_move()) != Move::none())
     {
         assert(move.is_ok());
@@ -1646,6 +1668,11 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
 
         givesCheck = pos.gives_check(move);
         capture    = pos.capture_stage(move);
+
+        // In forced capture variant, if captures exist and we're not in check,
+        // we must only consider captures
+        if (hasLegalCaptures && !ss->inCheck && !capture)
+            continue;
 
         moveCount++;
 

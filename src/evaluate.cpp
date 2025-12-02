@@ -85,6 +85,16 @@ Value Eval::evaluate(const Eval::NNUE::Networks&    networks,
     // Damp down the evaluation linearly when shuffling
     v -= v * pos.rule50_count() / 212;
 
+    // Mandatory capture variant: Small bonus for positions where opponent must capture
+    // This encourages piece sacrifices that force opponent captures, creating tactical opportunities
+    if (has_forced_captures(pos))
+    {
+        // Small positional bonus - opponent's forced captures can be exploited
+        // This is subtle because we want to encourage tactical opportunities
+        // but not overvalue material sacrifices
+        v += 5;  // Small bonus, can be tuned
+    }
+
     // Guarantee evaluation does not hit the tablebase range
     v = std::clamp(v, VALUE_TB_LOSS_IN_MAX_PLY + 1, VALUE_TB_WIN_IN_MAX_PLY - 1);
 

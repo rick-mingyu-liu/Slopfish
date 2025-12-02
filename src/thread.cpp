@@ -252,17 +252,41 @@ void ThreadPool::start_thinking(const OptionsMap&  options,
     Search::RootMoves rootMoves;
     const auto        legalmoves = MoveList<LEGAL>(pos);
 
-    for (const auto& uciMove : limits.searchmoves)
+    // Check if forced captures are required (mandatory capture variant)
+    bool hasLegalCaptures = has_forced_captures(pos);
+
+    // If captures exist, only consider capture moves
+    if (hasLegalCaptures)
     {
-        auto move = UCIEngine::to_move(pos, uciMove);
+        // Handle searchmoves option with forced captures
+        for (const auto& uciMove : limits.searchmoves)
+        {
+            auto move = UCIEngine::to_move(pos, uciMove);
+            if (pos.capture_stage(move) && 
+                std::find(legalmoves.begin(), legalmoves.end(), move) != legalmoves.end())
+                rootMoves.emplace_back(move);
+        }
 
-        if (std::find(legalmoves.begin(), legalmoves.end(), move) != legalmoves.end())
-            rootMoves.emplace_back(move);
+        // If no searchmoves specified, add all legal captures
+        if (rootMoves.empty())
+            for (const auto& m : legalmoves)
+                if (pos.capture_stage(m))
+                    rootMoves.emplace_back(m);
     }
+    else
+    {
+        // No captures available, use all legal moves (standard behavior)
+        for (const auto& uciMove : limits.searchmoves)
+        {
+            auto move = UCIEngine::to_move(pos, uciMove);
+            if (std::find(legalmoves.begin(), legalmoves.end(), move) != legalmoves.end())
+                rootMoves.emplace_back(move);
+        }
 
-    if (rootMoves.empty())
-        for (const auto& m : legalmoves)
-            rootMoves.emplace_back(m);
+        if (rootMoves.empty())
+            for (const auto& m : legalmoves)
+                rootMoves.emplace_back(m);
+    }
 
     Tablebases::Config tbConfig = Tablebases::rank_root_moves(options, pos, rootMoves);
 

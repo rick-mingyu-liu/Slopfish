@@ -332,6 +332,10 @@ inline bool Position::capture_stage(Move m) const {
 
 inline Piece Position::captured_piece() const { return st->capturedPiece; }
 
+// Returns true if the side to move has at least one legal capture move.
+// Used for mandatory capture variant where captures must be made if available.
+bool has_forced_captures(const Position& pos);
+
 inline void Position::put_piece(Piece pc, Square s) {
 
     board[s] = pc;

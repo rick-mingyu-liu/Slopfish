@@ -144,9 +144,16 @@ void MovePicker::score() {
 
     for (auto& m : *this)
         if constexpr (Type == CAPTURES)
+        {
             m.value =
               7 * int(PieceValue[pos.piece_on(m.to_sq())])
               + (*captureHistory)[pos.moved_piece(m)][m.to_sq()][type_of(pos.piece_on(m.to_sq()))];
+            
+            // Mandatory capture variant: Bonus for captures that check or expose opponent's king
+            // These are more valuable in forced capture variant as they create tactical opportunities
+            if (pos.gives_check(m))
+                m.value += 5000;  // Significant bonus for checking captures
+        }
 
         else if constexpr (Type == QUIETS)
         {
@@ -323,7 +330,8 @@ top:
         partial_insertion_sort(cur, endMoves, std::numeric_limits<int>::min());
         
         // Mandatory capture variant: if there are any capture evasions available,
-        // only allow capture evasions (non-capture evasions will be filtered out)
+        // only allow capture evasions (non-capture evasions will be filtered out).
+        // This ensures that if a capture can evade check, it must be used.
         if (endMoves > cur)
         {
             // Count capture evasions
