@@ -236,7 +236,10 @@ top:
         ++stage;
         goto top;
 
-    case GOOD_CAPTURE :
+    case GOOD_CAPTURE : {
+        // Store original end of captures before processing (endMoves still contains this)
+        ExtMove* originalEndCaptures = endMoves;
+        
         if (select([&]() {
                 // Move losing capture to endBadCaptures to be tried later
                 return pos.see_ge(*cur, -cur->value / 18) ? true
@@ -245,7 +248,25 @@ top:
             return *(cur - 1);
 
         ++stage;
+        
+        // Mandatory capture variant: if there are any captures available,
+        // skip quiet moves and go directly to bad captures
+        // FIX: Check original capture count (endMoves from CAPTURE_INIT), not just bad captures
+        // If all captures were "good", endBadCaptures == moves, but originalEndCaptures > moves
+        if (originalEndCaptures > moves)
+        {
+            // There are captures available, skip quiet moves
+            skipQuiets = true;
+            // Jump directly to BAD_CAPTURE stage
+            // Use endBadCaptures if there are bad captures, otherwise we've already returned all good ones
+            cur      = moves;
+            endMoves = endBadCaptures > moves ? endBadCaptures : originalEndCaptures;
+            stage    = BAD_CAPTURE;
+            goto top;
+        }
+        
         [[fallthrough]];
+    }
 
     case QUIET_INIT :
         if (!skipQuiets)
@@ -300,6 +321,22 @@ top:
 
         score<EVASIONS>();
         partial_insertion_sort(cur, endMoves, std::numeric_limits<int>::min());
+        
+        // Mandatory capture variant: if there are any capture evasions available,
+        // only allow capture evasions (non-capture evasions will be filtered out)
+        if (endMoves > cur)
+        {
+            // Count capture evasions
+            ExtMove* captureEnd = cur;
+            for (ExtMove* m = cur; m < endMoves; ++m)
+                if (pos.capture_stage(*m))
+                    *captureEnd++ = *m;
+            
+            // If there are capture evasions, only use those
+            if (captureEnd > cur)
+                endMoves = captureEnd;
+        }
+        
         ++stage;
         [[fallthrough]];
 
