@@ -330,8 +330,7 @@ top:
         partial_insertion_sort(cur, endMoves, std::numeric_limits<int>::min());
         
         // Mandatory capture variant: if there are any capture evasions available,
-        // only allow capture evasions (non-capture evasions will be filtered out).
-        // This ensures that if a capture can evade check, it must be used.
+        // only allow capture evasions (non-capture evasions will be filtered out)
         if (endMoves > cur)
         {
             // Count capture evasions
