@@ -27,6 +27,8 @@
 #include <utility>
 
 #include "movegen.h"
+#include "opening_cache.h"
+#include "position.h"
 #include "search.h"
 #include "syzygy/tbprobe.h"
 #include "timeman.h"
@@ -250,19 +252,74 @@ void ThreadPool::start_thinking(const OptionsMap&  options,
     increaseDepth = true;
 
     Search::RootMoves rootMoves;
-    const auto        legalmoves = MoveList<LEGAL>(pos);
-
-    for (const auto& uciMove : limits.searchmoves)
+    
+    // Check opening cache first for instant move lookup
+    Move cachedMove = OpeningCache::instance().lookup(pos.key());
+    if (cachedMove != Move::none() && pos.legal(cachedMove))
     {
-        auto move = UCIEngine::to_move(pos, uciMove);
-
-        if (std::find(legalmoves.begin(), legalmoves.end(), move) != legalmoves.end())
-            rootMoves.emplace_back(move);
+        // Verify the cached move respects forced capture rules
+        bool hasLegalCaptures = has_forced_captures(pos);
+        bool isCaptureMove = pos.capture_stage(cachedMove);
+        
+        // Use cached move only if it's valid under forced capture rules
+        if (!hasLegalCaptures || isCaptureMove)
+        {
+            rootMoves.emplace_back(cachedMove);
+        }
     }
-
+    
+    // Instant e4 for White in starting position
+    if (rootMoves.empty() && pos.game_ply() == 0 && pos.side_to_move() == WHITE)
+    {
+        Move e4Move = Move(SQ_E2, SQ_E4);
+        if (pos.legal(e4Move))
+        {
+            rootMoves.emplace_back(e4Move);
+        }
+    }
+    
+    // Sicilian Defense: instant c5 for Black after White's first move
+    if (rootMoves.empty() && pos.game_ply() == 1 && pos.side_to_move() == BLACK)
+    {
+        Move c5Move = Move(SQ_C7, SQ_C5);
+        if (pos.legal(c5Move))
+        {
+            rootMoves.emplace_back(c5Move);
+        }
+    }
+    
+    // If no instant move, proceed with normal move generation
     if (rootMoves.empty())
-        for (const auto& m : legalmoves)
-            rootMoves.emplace_back(m);
+    {
+        const auto legalmoves = MoveList<LEGAL>(pos);
+
+        for (const auto& uciMove : limits.searchmoves)
+        {
+            auto move = UCIEngine::to_move(pos, uciMove);
+
+            if (std::find(legalmoves.begin(), legalmoves.end(), move) != legalmoves.end())
+                rootMoves.emplace_back(move);
+        }
+
+        if (rootMoves.empty())
+        {
+            // Check if forced captures are required (mandatory capture variant)
+            bool hasLegalCaptures = has_forced_captures(pos);
+
+            // If captures exist, only consider capture moves
+            if (hasLegalCaptures)
+            {
+                for (const auto& m : legalmoves)
+                    if (pos.capture_stage(m))
+                        rootMoves.emplace_back(m);
+            }
+            else
+            {
+                for (const auto& m : legalmoves)
+                    rootMoves.emplace_back(m);
+            }
+        }
+    }
 
     Tablebases::Config tbConfig = Tablebases::rank_root_moves(options, pos, rootMoves);
 

@@ -41,6 +41,7 @@
 #include "movepick.h"
 #include "nnue/network.h"
 #include "nnue/nnue_accumulator.h"
+#include "opening_cache.h"
 #include "position.h"
 #include "syzygy/tbprobe.h"
 #include "thread.h"
@@ -252,6 +253,24 @@ void Search::Worker::start_searching() {
 
     main_manager()->bestPreviousScore        = bestThread->rootMoves[0].score;
     main_manager()->bestPreviousAverageScore = bestThread->rootMoves[0].averageScore;
+
+    // Store best move in opening cache for future games
+    // Only cache if we searched deeply enough and it's an opening position
+    if (bestThread->rootMoves[0].pv[0] != Move::none() 
+        && bestThread->completedDepth >= OpeningCache::MIN_CACHE_DEPTH)
+    {
+        OpeningCache::instance().store(
+            rootPos.key(),
+            bestThread->rootMoves[0].pv[0],
+            bestThread->completedDepth,
+            bestThread->rootMoves[0].score,
+            rootPos.game_ply()
+        );
+        
+        // Save cache to disk immediately (survives crashes/kills)
+        // Uses the same path that was set during load() in engine.cpp
+        OpeningCache::instance().save();
+    }
 
     // Send again PV info if we have a new best thread
     if (bestThread != this)

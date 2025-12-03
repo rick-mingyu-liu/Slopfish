@@ -1315,4 +1315,14 @@ bool Position::pos_is_ok() const {
     return true;
 }
 
+// Returns true if the side to move has at least one legal capture move.
+// Used for mandatory capture variant where captures must be made if available.
+bool has_forced_captures(const Position& pos) {
+    const auto captures = MoveList<CAPTURES>(pos);
+    for (const auto& m : captures)
+        if (pos.legal(m))
+            return true;
+    return false;
+}
+
 }  // namespace Stockfish
