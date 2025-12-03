@@ -27,6 +27,7 @@
 #include <utility>
 
 #include "movegen.h"
+#include "opening_cache.h"
 #include "search.h"
 #include "syzygy/tbprobe.h"
 #include "timeman.h"
@@ -250,19 +251,59 @@ void ThreadPool::start_thinking(const OptionsMap&  options,
     increaseDepth = true;
 
     Search::RootMoves rootMoves;
-    const auto        legalmoves = MoveList<LEGAL>(pos);
-
-    for (const auto& uciMove : limits.searchmoves)
+    
+    // Instant e4 for White in starting position (hardcoded, reliable)
+    if (pos.game_ply() == 0 && pos.side_to_move() == WHITE)
     {
-        auto move = UCIEngine::to_move(pos, uciMove);
-
-        if (std::find(legalmoves.begin(), legalmoves.end(), move) != legalmoves.end())
-            rootMoves.emplace_back(move);
+        Move e4Move = Move(SQ_E2, SQ_E4);
+        if (pos.legal(e4Move))
+        {
+            rootMoves.emplace_back(e4Move);
+        }
     }
-
+    
+    // Sicilian Defense: instant c5 for Black after White's first move (hardcoded, reliable)
+    if (rootMoves.empty() && pos.game_ply() == 1 && pos.side_to_move() == BLACK)
+    {
+        Move c5Move = Move(SQ_C7, SQ_C5);
+        if (pos.legal(c5Move))
+        {
+            rootMoves.emplace_back(c5Move);
+        }
+    }
+    
+    // For all other positions: generate all legal moves, use cache as hint
     if (rootMoves.empty())
-        for (const auto& m : legalmoves)
-            rootMoves.emplace_back(m);
+    {
+        const auto legalmoves = MoveList<LEGAL>(pos);
+
+        for (const auto& uciMove : limits.searchmoves)
+        {
+            auto move = UCIEngine::to_move(pos, uciMove);
+
+            if (std::find(legalmoves.begin(), legalmoves.end(), move) != legalmoves.end())
+                rootMoves.emplace_back(move);
+        }
+
+        if (rootMoves.empty())
+            for (const auto& m : legalmoves)
+                rootMoves.emplace_back(m);
+        
+        // Cache as hint: if we have a cached move, move it to the front
+        // This makes it searched first, but doesn't skip the search
+        Move cachedMove = OpeningCache::instance().lookup(pos.key());
+        if (cachedMove != Move::none())
+        {
+            auto it = std::find_if(rootMoves.begin(), rootMoves.end(),
+                [&](const Search::RootMove& rm) { return rm.pv[0] == cachedMove; });
+            
+            if (it != rootMoves.end() && it != rootMoves.begin())
+            {
+                // Rotate cached move to front (will be searched first)
+                std::rotate(rootMoves.begin(), it, it + 1);
+            }
+        }
+    }
 
     Tablebases::Config tbConfig = Tablebases::rank_root_moves(options, pos, rootMoves);
 
