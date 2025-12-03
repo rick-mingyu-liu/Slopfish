@@ -27,6 +27,7 @@
 #include <utility>
 
 #include "movegen.h"
+#include "opening_cache.h"
 #include "search.h"
 #include "syzygy/tbprobe.h"
 #include "timeman.h"
@@ -251,9 +252,24 @@ void ThreadPool::start_thinking(const OptionsMap&  options,
 
     Search::RootMoves rootMoves;
     
-    // Optimize opening: instantly return e4 for White in starting position
+    // Check opening cache first for instant move lookup
+    Move cachedMove = OpeningCache::instance().lookup(pos.key());
+    if (cachedMove != Move::none() && pos.legal(cachedMove))
+    {
+        // Verify the cached move respects forced capture rules
+        bool hasLegalCaptures = has_forced_captures(pos);
+        bool isCaptureMove = pos.capture_stage(cachedMove);
+        
+        // Use cached move only if it's valid under forced capture rules
+        if (!hasLegalCaptures || isCaptureMove)
+        {
+            rootMoves.emplace_back(cachedMove);
+        }
+    }
+    
+    // Fallback: instantly return e4 for White in starting position
     // This avoids long search times on the first move
-    if (pos.game_ply() == 0 && pos.side_to_move() == WHITE)
+    if (rootMoves.empty() && pos.game_ply() == 0 && pos.side_to_move() == WHITE)
     {
         Move e4Move = Move(SQ_E2, SQ_E4);
         // Verify it's legal (should always be in starting position)
@@ -264,7 +280,19 @@ void ThreadPool::start_thinking(const OptionsMap&  options,
         }
     }
     
-    // If we didn't add e4, proceed with normal move generation
+    // Sicilian Defense: instantly return c5 for Black after 1.e4
+    // This is a strong, aggressive response that creates asymmetric positions
+    if (rootMoves.empty() && pos.game_ply() == 1 && pos.side_to_move() == BLACK)
+    {
+        Move c5Move = Move(SQ_C7, SQ_C5);
+        // Verify it's legal (should be legal after 1.e4)
+        if (pos.legal(c5Move))
+        {
+            rootMoves.emplace_back(c5Move);
+        }
+    }
+    
+    // If we didn't find a cached move or opening book move, proceed with normal move generation
     if (rootMoves.empty())
     {
         const auto legalmoves = MoveList<LEGAL>(pos);

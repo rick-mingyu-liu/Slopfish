@@ -53,7 +53,7 @@ class Engine {
     Engine& operator=(const Engine&) = delete;
     Engine& operator=(Engine&&)      = delete;
 
-    ~Engine() { wait_for_search_finished(); }
+    ~Engine();  // Defined in engine.cpp - saves opening cache
 
     std::uint64_t perft(const std::string& fen, Depth depth, bool isChess960);
 

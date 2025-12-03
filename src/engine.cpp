@@ -34,6 +34,7 @@
 #include "nnue/network.h"
 #include "nnue/nnue_common.h"
 #include "numa.h"
+#include "opening_cache.h"
 #include "perft.h"
 #include "position.h"
 #include "search.h"
@@ -43,6 +44,9 @@
 #include "ucioption.h"
 
 namespace Stockfish {
+
+// Opening cache filename
+constexpr auto OpeningCacheFile = "slopfish_opening_cache.bin";
 
 namespace NN = Eval::NNUE;
 
@@ -62,6 +66,8 @@ Engine::Engine(std::optional<std::string> path) :
         NN::NetworkSmall({EvalFileDefaultNameSmall, "None", ""}, NN::EmbeddedNNUEType::SMALL))) {
     pos.set(StartFEN, false, &states->back());
 
+    // Load opening cache from file (if exists)
+    OpeningCache::instance().load(binaryDirectory + OpeningCacheFile);
 
     options.add(  //
       "Debug Log File", Option("", [](const Option& o) {
@@ -368,5 +374,12 @@ std::string Engine::thread_allocation_information_as_string() const {
     ss << boundThreadsByNodeStr;
 
     return ss.str();
+}
+
+Engine::~Engine() {
+    wait_for_search_finished();
+    
+    // Save opening cache to file
+    OpeningCache::instance().save(binaryDirectory + OpeningCacheFile);
 }
 }
