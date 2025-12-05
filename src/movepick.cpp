@@ -223,6 +223,9 @@ top:
     case QSEARCH_TT :
     case PROBCUT_TT :
         ++stage;
+        // Mandatory capture: skip quiet TT move if captures exist
+        if (ttMove && !pos.capture_stage(ttMove) && pos.has_captures())
+            goto top;
         return ttMove;
 
     case CAPTURE_INIT :

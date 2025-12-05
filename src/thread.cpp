@@ -250,6 +250,7 @@ void ThreadPool::start_thinking(const OptionsMap&  options,
     increaseDepth = true;
 
     Search::RootMoves rootMoves;
+    
     const auto        legalmoves = MoveList<LEGAL>(pos);
 
     for (const auto& uciMove : limits.searchmoves)
@@ -263,6 +264,18 @@ void ThreadPool::start_thinking(const OptionsMap&  options,
     if (rootMoves.empty())
         for (const auto& m : legalmoves)
             rootMoves.emplace_back(m);
+
+    // Mandatory capture variant: if any capture is available at root, filter to only captures
+    {
+        Search::RootMoves captureRootMoves;
+        for (const auto& rm : rootMoves)
+        {
+            if (pos.capture_stage(rm.pv[0]))
+                captureRootMoves.push_back(rm);
+        }
+        if (!captureRootMoves.empty())
+            rootMoves = std::move(captureRootMoves);
+    }
 
     Tablebases::Config tbConfig = Tablebases::rank_root_moves(options, pos, rootMoves);
 
