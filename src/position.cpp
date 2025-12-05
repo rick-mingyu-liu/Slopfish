@@ -1262,6 +1262,11 @@ void Position::flip() {
     assert(pos_is_ok());
 }
 
+bool Position::has_captures() const {
+    ExtMove moveList[256];
+    return generate<CAPTURES>(*this, moveList) > moveList;
+}
+
 
 // Performs some consistency checks for the position object
 // and raise an assert if something wrong is detected.
