@@ -12,6 +12,7 @@ https://medium.com/data-science/dissecting-stockfish-part-3-in-depth-look-at-a-c
 
 ## Compile Command
 ```bash
+cd src
 make build ARCH=native
 ```
 
