@@ -277,6 +277,21 @@ void ThreadPool::start_thinking(const OptionsMap&  options,
             rootMoves = std::move(captureRootMoves);
     }
 
+    // Slopfish: Force f3 (f2f3) as the ONLY move when playing as white from starting position
+    if (pos.game_ply() == 0 && pos.side_to_move() == WHITE)
+    {
+        Move f3Move(SQ_F2, SQ_F3);
+        for (const auto& rm : rootMoves)
+        {
+            if (rm.pv[0] == f3Move)
+            {
+                rootMoves.clear();
+                rootMoves.emplace_back(f3Move);
+                break;
+            }
+        }
+    }
+
     Tablebases::Config tbConfig = Tablebases::rank_root_moves(options, pos, rootMoves);
 
     // After ownership transfer 'states' becomes empty, so if we stop the search
