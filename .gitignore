@@ -1,4 +1,6 @@
-polyglot.log
+*.log
 *.o
 .depend
 slopfish
+*.tmp
+polyglot.log
