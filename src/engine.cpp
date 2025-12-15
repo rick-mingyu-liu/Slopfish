@@ -76,8 +76,8 @@ Engine::Engine(std::optional<std::string> path) :
                + thread_allocation_information_as_string();
       }));
 
-    options.add(  //
-      "Threads", Option(1, 1, MaxThreads, [this](const Option&) {
+    options.add(  // default 22 threads, minimum 8 
+      "Threads", Option(22, 8, MaxThreads, [this](const Option&) {
           resize_threads();
           return thread_allocation_information_as_string();
       }));

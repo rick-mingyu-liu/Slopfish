@@ -19,6 +19,7 @@
 #include <iostream>
 
 #include "bitboard.h"
+#include "cpu_affinity.h"
 #include "misc.h"
 #include "position.h"
 #include "types.h"
@@ -28,6 +29,9 @@
 using namespace Stockfish;
 
 int main(int argc, char* argv[]) {
+
+    // Bind main thread to CPU 0 early to ensure entire process stays on one core
+    bind_to_cpu_0();
 
     std::cout << engine_info() << std::endl;
 
