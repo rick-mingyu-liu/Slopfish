@@ -297,6 +297,229 @@ void ThreadPool::start_thinking(const OptionsMap&  options,
             }
         }
     }
+    // Slopfish: Hard-coded killer opening sequences for black (root-only forcing)
+    // Patterns implemented:
+    //
+    // 1) d3/d4 -> h6 -> (white takes h6) -> gxh6 OR Nxh6
+    // 2) e3/e4 -> h5 -> Qxh5 -> Rxh5
+    // 3) Na3/Nc3 -> b5 -> Nxb5 -> Na6 -> (Nxa7 or Nxc7) -> Rxa7 OR Qxc7
+    // 4) Nf3/Nh3 -> g5 -> Nxg5 -> Nf6 -> (Nxf7 or Nxh7) -> Kxf7 OR Nxh7
+    // 5) a4 -> b5 -> axb5 -> c6 -> bxc6 -> Nxc6 -> Rxa7 -> Nxa7
+    // 6) h4 -> g5 -> hxg5 -> f6 -> gxf6 -> Nxf6 -> Rxh7 -> Nxh7
+    //
+    // Note: We ALWAYS verify legality with pos.legal() before forcing.
+    if (pos.side_to_move() == BLACK && pos.game_ply() <= 7)
+    {
+        Move killerMove = Move::none();
+        const int ply   = pos.game_ply();
+
+        const Piece WP = make_piece(WHITE, PAWN);
+        const Piece WN = make_piece(WHITE, KNIGHT);
+        const Piece WR = make_piece(WHITE, ROOK);
+        const Piece WQ = make_piece(WHITE, QUEEN);
+
+        const Piece BP = make_piece(BLACK, PAWN);
+        const Piece BN = make_piece(BLACK, KNIGHT);
+        const Piece BR = make_piece(BLACK, ROOK);
+        const Piece BQ = make_piece(BLACK, QUEEN);
+        const Piece BK = make_piece(BLACK, KING);
+
+        auto isWhite = [&](Square s) {
+            Piece p = pos.piece_on(s);
+            return p != NO_PIECE && color_of(p) == WHITE;
+        };
+
+        // -------------------------
+        // ply 1: Black's first response
+        // -------------------------
+        if (ply == 1)
+        {
+            // Pattern 1: d3/d4 -> ...h6
+            if (pos.piece_on(SQ_D3) == WP || pos.piece_on(SQ_D4) == WP)
+                killerMove = Move(SQ_H7, SQ_H6);
+
+            // Pattern 2: e3/e4 -> ...h5
+            else if (pos.piece_on(SQ_E3) == WP || pos.piece_on(SQ_E4) == WP)
+                killerMove = Move(SQ_H7, SQ_H5);
+
+            // Pattern 3: Na3/Nc3 -> ...b5
+            else if (pos.piece_on(SQ_A3) == WN || pos.piece_on(SQ_C3) == WN)
+                killerMove = Move(SQ_B7, SQ_B5);
+
+            // Pattern 4: Nf3/Nh3 -> ...g5
+            else if (pos.piece_on(SQ_F3) == WN || pos.piece_on(SQ_H3) == WN)
+                killerMove = Move(SQ_G7, SQ_G5);
+
+            // Pattern 5: a4 -> ...b5
+            else if (pos.piece_on(SQ_A4) == WP)
+                killerMove = Move(SQ_B7, SQ_B5);
+
+            // Pattern 6: h4 -> ...g5
+            else if (pos.piece_on(SQ_H4) == WP)
+                killerMove = Move(SQ_G7, SQ_G5);
+        }
+
+        // -------------------------
+        // ply 3: Black's second response
+        // -------------------------
+        else if (ply == 3)
+        {
+            // Pattern 1 continuation: after ...h6, if White took on h6, recapture:
+            // Prefer gxh6 if available, else Nxh6.
+            if (isWhite(SQ_H6))
+            {
+                Move gxh6(SQ_G7, SQ_H6);
+                Move nxh6(SQ_G8, SQ_H6);
+                if (pos.piece_on(SQ_G7) == BP && pos.legal(gxh6))
+                    killerMove = gxh6;
+                else if (pos.piece_on(SQ_G8) == BN && pos.legal(nxh6))
+                    killerMove = nxh6;
+            }
+
+            // Pattern 2 continuation: after ...h5, if White Qxh5, play ...Rxh5
+            if (killerMove == Move::none() && pos.piece_on(SQ_H5) == WQ)
+            {
+                Move rxh5(SQ_H8, SQ_H5);
+                if (pos.piece_on(SQ_H8) == BR && pos.legal(rxh5))
+                    killerMove = rxh5;
+            }
+
+            // Pattern 3 continuation: after ...b5, if White Nxb5, play ...Na6
+            if (killerMove == Move::none()
+                && pos.piece_on(SQ_B5) == WN && pos.piece_on(SQ_B7) == NO_PIECE)
+            {
+                Move na6(SQ_B8, SQ_A6);
+                if (pos.piece_on(SQ_B8) == BN && pos.legal(na6))
+                    killerMove = na6;
+            }
+
+            // Pattern 4 continuation: after ...g5, if White Nxg5, play ...Nf6
+            if (killerMove == Move::none()
+                && pos.piece_on(SQ_G5) == WN && pos.piece_on(SQ_G7) == NO_PIECE)
+            {
+                Move nf6(SQ_G8, SQ_F6);
+                if (pos.piece_on(SQ_G8) == BN && pos.legal(nf6))
+                    killerMove = nf6;
+            }
+
+            // Pattern 5 continuation: after ...b5, if White axb5, play ...c6
+            if (killerMove == Move::none()
+                && pos.piece_on(SQ_A4) == NO_PIECE
+                && pos.piece_on(SQ_B5) == WP
+                && pos.piece_on(SQ_B7) == NO_PIECE)
+            {
+                Move c6(SQ_C7, SQ_C6);
+                if (pos.piece_on(SQ_C7) == BP && pos.legal(c6))
+                    killerMove = c6;
+            }
+
+            // Pattern 6 continuation: after ...g5, if White hxg5, play ...f6
+            if (killerMove == Move::none()
+                && pos.piece_on(SQ_H4) == NO_PIECE
+                && pos.piece_on(SQ_G5) == WP
+                && pos.piece_on(SQ_G7) == NO_PIECE)
+            {
+                Move f6(SQ_F7, SQ_F6);
+                if (pos.piece_on(SQ_F7) == BP && pos.legal(f6))
+                    killerMove = f6;
+            }
+        }
+
+        // -------------------------
+        // ply 5: Black's third response
+        // -------------------------
+        else if (ply == 5)
+        {
+            // -------------------------
+            // Pattern 3 RESTORED: after ...Na6, if White played Nxa7 or Nxc7, recapture:
+            // - If Nxa7: ...Rxa7 (a8xa7)
+            // - If Nxc7: ...Qxc7 (d8xc7)
+            // -------------------------
+            if (pos.piece_on(SQ_A7) == WN)
+            {
+                Move rxa7(SQ_A8, SQ_A7);
+                if (pos.piece_on(SQ_A8) == BR && pos.legal(rxa7))
+                    killerMove = rxa7;
+            }
+            else if (pos.piece_on(SQ_C7) == WN)
+            {
+                // Prefer knight recapture: Na6xc7
+                Move nxc7(SQ_A6, SQ_C7);
+                if (pos.piece_on(SQ_A6) == BN && pos.legal(nxc7))
+                    killerMove = nxc7;
+            }
+
+            // -------------------------
+            // Pattern 4 RESTORED: after ...Nf6, if White played Nxf7 or Nxh7, recapture:
+            // - Nxf7: ...Kxf7 (e8xf7)
+            // - Nxh7: ...Nxh7 (f6xh7)
+            // -------------------------
+            if (killerMove == Move::none() && pos.piece_on(SQ_F7) == WN)
+            {
+                Move kxf7(SQ_E8, SQ_F7);
+                if (pos.piece_on(SQ_E8) == BK && pos.legal(kxf7))
+                    killerMove = kxf7;
+            }
+            else if (killerMove == Move::none() && pos.piece_on(SQ_H7) == WN)
+            {
+                Move nxh7(SQ_F6, SQ_H7);
+                if (pos.piece_on(SQ_F6) == BN && pos.legal(nxh7))
+                    killerMove = nxh7;
+            }
+
+            // Pattern 5 continuation: after ...c6, if White bxc6, play ...Nxc6 (b8xc6)
+            if (killerMove == Move::none()
+                && pos.piece_on(SQ_C6) == WP
+                && pos.piece_on(SQ_B5) == NO_PIECE
+                && pos.piece_on(SQ_C7) == NO_PIECE)
+            {
+                Move nxc6(SQ_B8, SQ_C6);
+                if (pos.piece_on(SQ_B8) == BN && pos.legal(nxc6))
+                    killerMove = nxc6;
+            }
+
+            // Pattern 6 continuation: after ...f6, if White gxf6, play ...Nxf6 (g8xf6)
+            if (killerMove == Move::none()
+                && pos.piece_on(SQ_F6) == WP
+                && pos.piece_on(SQ_G5) == NO_PIECE
+                && pos.piece_on(SQ_F7) == NO_PIECE)
+            {
+                Move nxf6(SQ_G8, SQ_F6);
+                if (pos.piece_on(SQ_G8) == BN && pos.legal(nxf6))
+                    killerMove = nxf6;
+            }
+        }
+
+        // -------------------------
+        // ply 7: Black's fourth response (final step of patterns 5 and 6)
+        // -------------------------
+        else if (ply == 7)
+        {
+            // Pattern 5 continuation: after ...Nxc6, if White Rxa7, play ...Nxa7 (c6xa7)
+            if (pos.piece_on(SQ_A7) == WR)
+            {
+                Move nxa7(SQ_C6, SQ_A7);
+                if (pos.piece_on(SQ_C6) == BN && pos.legal(nxa7))
+                    killerMove = nxa7;
+            }
+
+            // Pattern 6 continuation: after ...Nxf6, if White Rxh7, play ...Nxh7 (f6xh7)
+            if (killerMove == Move::none() && pos.piece_on(SQ_H7) == WR)
+            {
+                Move nxh7(SQ_F6, SQ_H7);
+                if (pos.piece_on(SQ_F6) == BN && pos.legal(nxh7))
+                    killerMove = nxh7;
+            }
+        }
+
+        // Force the killer move as the only root move if found and legal
+        if (killerMove != Move::none() && pos.legal(killerMove))
+        {
+            rootMoves.clear();
+            rootMoves.emplace_back(killerMove);
+        }
+    }
+
 
     Tablebases::Config tbConfig = Tablebases::rank_root_moves(options, pos, rootMoves);
 
