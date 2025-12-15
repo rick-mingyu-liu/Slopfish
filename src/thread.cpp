@@ -26,7 +26,9 @@
 #include <unordered_map>
 #include <utility>
 
+#include "cpu_affinity.h"
 #include "movegen.h"
+#include "misc.h"
 #include "search.h"
 #include "syzygy/tbprobe.h"
 #include "timeman.h"
@@ -49,6 +51,10 @@ Thread::Thread(Search::SharedState&                    sharedState,
     wait_for_search_finished();
 
     run_custom_job([this, &binder, &sharedState, &sm, n]() {
+        // Force bind this thread to CPU core 0
+        // All threads must run on a single CPU core as required
+        bind_to_cpu_0();
+        
         // Use the binder to [maybe] bind the threads to a NUMA node before doing
         // the Worker allocation. Ideally we would also allocate the SearchManager
         // here, but that's minor.
