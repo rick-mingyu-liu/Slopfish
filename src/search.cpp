@@ -1607,7 +1607,8 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
         }
 
         // Stand pat. Return immediately if static value is at least beta
-        if (bestValue >= beta)
+        // BUT: In mandatory capture variant, can't stand pat if captures exist
+        if (bestValue >= beta && !pos.has_captures())
         {
             if (!is_decisive(bestValue))
                 bestValue = (bestValue + beta) / 2;
