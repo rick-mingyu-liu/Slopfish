@@ -149,8 +149,7 @@ void ThreadPool::set(const NumaConfig&                           numaConfig,
         boundThreadToNumaNode.clear();
     }
 
-    // const size_t requested = sharedState.options["Threads"];
-    const size_t requested = 1;
+    const size_t requested = sharedState.options["Threads"];
 
     if (requested > 0)  // create new thread(s)
     {

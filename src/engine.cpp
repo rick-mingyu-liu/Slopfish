@@ -77,8 +77,7 @@ Engine::Engine(std::optional<std::string> path) :
       }));
 
     options.add(  //
-    //   "Threads", Option(1, 1, MaxThreads, [this](const Option&) {
-      "Threads", Option(1, 1, 1, [this](const Option&) {
+      "Threads", Option(1, 1, MaxThreads, [this](const Option&) {
           resize_threads();
           return thread_allocation_information_as_string();
       }));
