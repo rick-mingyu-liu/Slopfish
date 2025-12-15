@@ -34,8 +34,51 @@
 #include "types.h"
 #include "uci.h"
 #include "nnue/nnue_accumulator.h"
+#include "movegen.h"
+#include "position.h"
 
 namespace Stockfish {
+
+// Returns true if the side to move has at least one LEGAL capture.
+// Fast path: if no pins, pseudo-legal captures are effectively legal.
+static inline bool has_legal_capture_fast(const Position& pos) {
+    Color us = pos.side_to_move();
+
+    // If there are no pseudo-legal captures, there can't be legal captures.
+    if (!pos.has_captures())
+        return false;
+
+    // No pins => any pseudo-legal capture is legal in practice.
+    if (!pos.blockers_for_king(us))
+        return true;
+
+    // With pins, confirm legality.
+    for (const auto& m : MoveList<CAPTURES>(pos))
+        if (pos.legal(m))
+            return true;
+
+    return false;
+}
+
+// Returns true if there exists a legal (or effectively legal when unpinned) capture with SEE >= 0.
+// Assumes that there is at least one legal capture (checked before calling this function).
+static inline bool has_nonlosing_forced_capture(const Position& pos) {
+    Color us = pos.side_to_move();
+
+    if (!pos.has_captures())
+        return false;
+
+    bool pinned = pos.blockers_for_king(us);
+
+    for (const auto& m : MoveList<CAPTURES>(pos)) {
+        if (pinned && !pos.legal(m))
+            continue;
+
+        if (pos.see_ge(m, 0))
+            return true;
+    }
+    return false;
+}
 
 // Returns a static, purely materialistic evaluation of the position from
 // the point of view of the given color. It can be divided by PawnValue to get
@@ -78,9 +121,21 @@ Value Eval::evaluate(const Eval::NNUE::Networks&    networks,
     int nnueComplexity = std::abs(psqt - positional);
     optimism += optimism * nnueComplexity / 468;
     nnue -= nnue * nnueComplexity / 18000;
+    //
+    constexpr int ForcedCaptureGoodBonus   = 10;  // tune
+    constexpr int ForcedCaptureBadPenalty  = 18;  // tune
 
     int material = 535 * pos.count<PAWN>() + pos.non_pawn_material();
     int v        = (nnue * (77777 + material) + optimism * (7777 + material)) / 77777;
+
+    // Variant bias: if captures are forced and we have no non-losing capture,
+    // slightly penalize; otherwise small bonus.
+    if (has_legal_capture_fast(pos)) {
+        if (has_nonlosing_forced_capture(pos))
+            v += ForcedCaptureGoodBonus;
+        else
+            v -= ForcedCaptureBadPenalty;
+    }
 
     // Damp down the evaluation linearly when shuffling
     v -= v * pos.rule50_count() / 212;
