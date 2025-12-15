@@ -1,0 +1,4 @@
+polyglot.log
+*.o
+.depend
+slopfish
