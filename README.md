@@ -2,7 +2,7 @@
 - Rick
 - Evan
 - Rohit
-- 
+  
 ## Slopfish is based on the original Stockfish Program: 
 We used the Stockfish program as a foundation and changed the evaluation-related files to achieve the variant of captures are forced.
 
