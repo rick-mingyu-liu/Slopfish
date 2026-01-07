@@ -1,12 +1,10 @@
-# Team: Slopfish
-- Rick
-- Evan
-- Rohit
-  
 ## Slopfish is based on the original Stockfish Program: 
 We used the Stockfish program as a foundation and changed the evaluation-related files to achieve the variant of captures are forced.
 
 https://github.com/official-stockfish/Stockfish
+
+### NOTE
+`nnue-pytorch` is the folder to train the nnue
 
 ## Links for explaining the original program (Stockfish)
 https://medium.com/data-science/dissecting-stockfish-part-1-in-depth-look-at-a-chess-engine-7fddd1d83579
