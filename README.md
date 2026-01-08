@@ -6,6 +6,8 @@ https://github.com/official-stockfish/Stockfish
 ### NOTE
 `nnue-pytorch` is the folder to train the nnue
 
+https://github.com/rick-mingyu-liu/NNUE_Train
+
 ## Links for explaining the original program (Stockfish)
 https://medium.com/data-science/dissecting-stockfish-part-1-in-depth-look-at-a-chess-engine-7fddd1d83579
 
