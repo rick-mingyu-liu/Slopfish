@@ -4,3 +4,4 @@
 slopfish
 *.tmp
 polyglot.log
+.omc/
