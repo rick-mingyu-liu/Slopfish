@@ -1263,8 +1263,17 @@ void Position::flip() {
 }
 
 bool Position::has_captures() const {
-    ExtMove moveList[256];
-    return generate<CAPTURES>(*this, moveList) > moveList;
+    ExtMove  moveList[256];
+    ExtMove* end = generate<CAPTURES>(*this, moveList);
+
+    // generate<CAPTURES> also emits queen promotions that capture nothing (they
+    // belong to Stockfish's "capture stage" for move ordering). The variant rule
+    // is about actual captures, so those must not count here.
+    for (ExtMove* m = moveList; m < end; ++m)
+        if (capture(*m))
+            return true;
+
+    return false;
 }
 
 
