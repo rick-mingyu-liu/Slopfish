@@ -224,7 +224,7 @@ top:
     case PROBCUT_TT :
         ++stage;
         // Mandatory capture: skip quiet TT move if captures exist
-        if (ttMove && !pos.capture_stage(ttMove) && pos.has_captures())
+        if (ttMove && !pos.capture(ttMove) && pos.has_captures())
             goto top;
         return ttMove;
 
@@ -251,23 +251,35 @@ top:
             return *(cur - 1);
 
         ++stage;
-        
-        // Mandatory capture variant: if there are any captures available,
-        // skip quiet moves and go directly to bad captures
-        // FIX: Check original capture count (endMoves from CAPTURE_INIT), not just bad captures
-        // If all captures were "good", endBadCaptures == moves, but originalEndCaptures > moves
-        if (originalEndCaptures > moves)
+
+        // Mandatory capture variant: when a real capture exists, quiet moves are
+        // illegal, so never generate them -- go straight to the bad captures.
+        // The generated list also holds queen promotions that capture nothing, so
+        // test pos.capture() rather than just comparing pointers.
         {
-            // There are captures available, skip quiet moves
-            skipQuiets = true;
-            // Jump directly to BAD_CAPTURE stage
-            // Use endBadCaptures if there are bad captures, otherwise we've already returned all good ones
-            cur      = moves;
-            endMoves = endBadCaptures > moves ? endBadCaptures : originalEndCaptures;
-            stage    = BAD_CAPTURE;
-            goto top;
+            bool anyRealCapture = false;
+            for (ExtMove* m = moves; m < originalEndCaptures; ++m)
+                if (pos.capture(*m))
+                {
+                    anyRealCapture = true;
+                    break;
+                }
+
+            if (anyRealCapture)
+            {
+                skipQuiets = true;
+                stage      = BAD_CAPTURE;
+
+                // Bad captures live in [moves, endBadCaptures). If there are none,
+                // every capture was good and has already been emitted, so leave an
+                // empty range -- rewinding to originalEndCaptures here would hand
+                // back every good capture a second time.
+                cur      = moves;
+                endMoves = endBadCaptures;
+                goto top;
+            }
         }
-        
+
         [[fallthrough]];
     }
 
@@ -332,7 +344,7 @@ top:
             // Count capture evasions
             ExtMove* captureEnd = cur;
             for (ExtMove* m = cur; m < endMoves; ++m)
-                if (pos.capture_stage(*m))
+                if (pos.capture(*m))
                     *captureEnd++ = *m;
             
             // If there are capture evasions, only use those

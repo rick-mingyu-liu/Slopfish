@@ -1,0 +1,21 @@
+{
+  "engine_a": "full-fixed",
+  "engine_b": "noqs-fixed",
+  "tc": "5+0.05",
+  "games": 400,
+  "wins": 104,
+  "draws": 206,
+  "losses": 90,
+  "score": 0.5175,
+  "elo": 12.16521457965757,
+  "elo_95ci": 23.711248477310196,
+  "mean_plies": 97.7775,
+  "termination_reasons": {
+    "CHECKMATE": 194,
+    "THREEFOLD_REPETITION": 166,
+    "INSUFFICIENT_MATERIAL": 34,
+    "FIFTY_MOVES": 2,
+    "STALEMATE": 4
+  },
+  "wall_seconds": 1534.0152192115784
+}

@@ -1,0 +1,4 @@
+illegal_cases.log
+*.pgn
+__pycache__/
+.omc/

@@ -54,7 +54,7 @@ static inline bool has_legal_capture_fast(const Position& pos) {
 
     // With pins, confirm legality.
     for (const auto& m : MoveList<CAPTURES>(pos))
-        if (pos.legal(m))
+        if (pos.capture(m) && pos.legal(m))
             return true;
 
     return false;
@@ -71,6 +71,9 @@ static inline bool has_nonlosing_forced_capture(const Position& pos) {
     bool pinned = pos.blockers_for_king(us);
 
     for (const auto& m : MoveList<CAPTURES>(pos)) {
+        if (!pos.capture(m))
+            continue;
+
         if (pinned && !pos.legal(m))
             continue;
 

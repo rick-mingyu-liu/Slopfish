@@ -1,0 +1,22 @@
+{
+  "engine_a": "full",
+  "engine_b": "noqs",
+  "tc": "5+0.05",
+  "games": 1000,
+  "wins": 229,
+  "draws": 555,
+  "losses": 216,
+  "score": 0.5065,
+  "elo": 4.516917076257425,
+  "elo_95ci": 14.364856579224895,
+  "mean_plies": 97.338,
+  "termination_reasons": {
+    "CHECKMATE": 420,
+    "THREEFOLD_REPETITION": 432,
+    "illegal-declined-capture": 25,
+    "INSUFFICIENT_MATERIAL": 97,
+    "STALEMATE": 25,
+    "FIFTY_MOVES": 1
+  },
+  "wall_seconds": 3812.812919855118
+}
